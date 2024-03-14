@@ -1,11 +1,11 @@
-module Lib ( day2, day3, day4, day5, day6, day7, day8 ) where
+module Lib ( day1, day2, day3, day4, day5, day6, day7, day8 ) where
 
 import           Data.Bifunctor       (Bifunctor (first), bimap, second)
 import           Data.Char            (isAlpha, isDigit, ord)
 import           Data.Function        (on)
 import           Data.Functor.Classes (Ord1 (liftCompare))
-import           Data.List            (group, groupBy, maximumBy, singleton,
-                                       sort, sortBy)
+import           Data.List            (group, groupBy, intercalate, maximumBy,
+                                       singleton, sort, sortBy)
 import           Data.Maybe           (fromMaybe, listToMaybe)
 import           Text.Regex.PCRE      (getAllTextMatches, (=~))
 import           Utility              (Card (..), Type (..), adjacentPairs,
@@ -215,6 +215,9 @@ process s = (dropRows 0, dropRows 1, dropRows 2)
 match :: String -> String -> [String]
 match re s = getAllTextMatches $ s =~ re :: [String]
 
+firstMatch :: String -> String -> String
+firstMatch = flip (=~)
+
 day2 :: String -> String
 day2 s = showIntPair (sol1 s, sol2 s) -- (2061, 72596)
     where
@@ -234,3 +237,17 @@ day2 s = showIntPair (sol1 s, sol2 s) -- (2061, 72596)
 
         sol1 = sum . map fst . filter snd . zip [1..] . map (all valid . match re) . lines
         sol2 = sum . map ((\(r, g, b) -> r * g * b) . foldl optimal (0, 0, 0) . match re) . lines
+
+
+day1 :: String -> String
+day1 s = show (sol (f "\\d") (l "\\d"), sol (f re) (l re')) -- (55017, 53539)
+    where
+        ints  = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+
+        re  = "(" ++ intercalate "|" ints ++ "|\\d)"
+        re' = "(" ++ intercalate "|" (map reverse ints) ++ "|\\d)"
+
+        f r = (10*) . toInt . firstMatch r
+        l r = toInt . reverse . firstMatch r . reverse
+
+        sol fFunc lFunc = sum . uncurry (zipWith (+)) . bimap (map fFunc) (map lFunc) . dup $ lines s

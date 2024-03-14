@@ -8,7 +8,17 @@ concatTuples3 :: [(b, b, b)] -> [b]
 concatTuples3   = (=<<) (\ (n, m, o) -> [n, m, o])
 
 toInt :: String -> Int
-toInt a = read a :: Int
+toInt "zero"  = 0
+toInt "one"   = 1
+toInt "two"   = 2
+toInt "three" = 3
+toInt "four"  = 4
+toInt "five"  = 5
+toInt "six"   = 6
+toInt "seven" = 7
+toInt "eight" = 8
+toInt "nine"  = 9
+toInt a       = read a :: Int
 
 showIntPair :: (Int, Int) -> String
 showIntPair = show
