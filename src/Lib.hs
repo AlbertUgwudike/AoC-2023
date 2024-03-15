@@ -1,4 +1,4 @@
-module Lib ( day1, day2, day3, day4, day5, day6, day7, day8 ) where
+module Lib ( day1, day2, day3, day4, day5, day6, day7, day8, day9 ) where
 
 import           Data.Bifunctor       (Bifunctor (first), bimap, second)
 import           Data.Char            (isAlpha, isDigit, ord)
@@ -15,6 +15,17 @@ import           Utility              (Card (..), Type (..), adjacentPairs,
 
 import qualified Data.IntMap          as IntMap
 import qualified Data.IntSet          as IntSet
+
+
+day9 :: String -> String
+day9 s = show (sol (+) last s, sol (-) head s) -- (1696140818, 1152)
+    where sol c e = sum . map (day9' c e . map toInt . words) . lines
+
+day9' :: (Int -> Int -> Int) -> ([Int] -> Int) -> [Int] -> Int
+day9' combine extract xs
+    | all (== 0) xs = 0
+    | otherwise = combine (extract xs) (day9' combine extract diffs)
+    where diffs = zipWith (-) (tail xs) xs
 
 
 day8 :: String -> String
