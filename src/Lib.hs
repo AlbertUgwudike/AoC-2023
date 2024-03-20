@@ -1,20 +1,89 @@
-module Lib ( day1, day2, day3, day4, day5, day6, day7, day8, day9 ) where
+module Lib ( day1, day2, day3, day4, day5, day6, day7, day8, day9, day10 ) where
 
+import           Control.Arrow        ((&&&))
+import           Data.Array           (Array, Ix, assocs, listArray)
+import           Data.Array.Base      ((!?))
 import           Data.Bifunctor       (Bifunctor (first), bimap, second)
 import           Data.Char            (isAlpha, isDigit, ord)
 import           Data.Function        (on)
 import           Data.Functor.Classes (Ord1 (liftCompare))
-import           Data.List            (group, groupBy, intercalate, maximumBy,
-                                       singleton, sort, sortBy)
-import           Data.Maybe           (fromMaybe, listToMaybe)
+import           Data.List            (find, group, groupBy, intercalate,
+                                       maximumBy, singleton, sort, sortBy)
+import           Data.Maybe           (fromMaybe, isNothing, listToMaybe)
 import           Text.Regex.PCRE      (getAllTextMatches, (=~))
-import           Utility              (Card (..), Type (..), adjacentPairs,
-                                       concatTuples3, dup, parseCard, replace,
-                                       showIntPair, snd3, toInt, tuple3)
+import           Utility              (Card (..), Type (..), addPair,
+                                       adjacentPairs, concatTuples3, dup,
+                                       parseCard, replace, showIntPair, snd3,
+                                       subPair, toInt, tuple3)
 
 
 import qualified Data.IntMap          as IntMap
 import qualified Data.IntSet          as IntSet
+
+
+day10 :: String -> String
+day10 s = show (sol1, sol2) -- (6682, 353)
+    where
+        (h, w) = length &&& (length . head) $ lines s
+        matrix = listArray ((0, 0), (h - 1, w - 1)) . concat $ lines s
+        start  = fst <$> fromMaybe ((0, 0), 'S') . find ((== 'S') . snd) $ assocs matrix
+        path   = day10_1 matrix [] start
+        ori    = case subPair (head path) start of { (0, 1) -> E; (1, 0) -> S; (-1, 0) -> N; _ -> W }
+        (o, r) = day10_2 matrix (IntSet.fromList $ map hash10 path) ori path
+
+        sol1   = flip div 2 $ length path
+        sol2   = if o > 1 then IntSet.size r - length path else h * w - IntSet.size r
+
+day10_1 :: Array (Int, Int) Char -> [(Int, Int)] -> (Int, Int) -> [(Int, Int)]
+day10_1 matrix path p = maybe (p : path) rest $ find canGo dirs
+    where
+        dirs   = [(-1, 0), (0, -1), (0, 1), (1, 0)]
+        check  = connects matrix p &&& ((/= listToMaybe path) . Just)
+        canGo  = uncurry (&&) . check . addPair p
+        rest   = day10_1 matrix (p : path) . addPair p
+
+connects :: Array (Int, Int) Char -> (Int, Int) -> (Int, Int) -> Bool
+connects matrix p1 p2 = fromMaybe False $ do
+    a <- matrix !? p1
+    b <- matrix !? p2
+    return . uncurry (&&) . bimap (elem a) (elem b) $ connections
+    where
+        connections = case subPair p2 p1 of
+            (-1,  0) -> ("S|LJ", "|F7")
+            ( 0, -1) -> ("S-J7", "-LF")
+            ( 0,  1) -> ("S-LF", "-J7")
+            _        -> ("S|F7", "|LJ")
+
+hash10 :: (Int, Int) -> Int
+hash10 = uncurry (+) . first (* 140)
+
+data Orientation = N | E | S | W deriving (Eq, Ord, Enum, Ix)
+
+cw, aw :: Orientation -> Orientation
+cw o = if o == W then N else succ o
+aw o = if o == N then W else pred o
+
+day10_2 :: Array (Int, Int) Char  -> IntSet.IntSet -> Orientation -> [(Int, Int)] -> (Int, IntSet.IntSet)
+day10_2 _ region _ [] = (0, region)
+day10_2 matrix region o (p : path)
+    | c `notElem` "7JLF" = day10_2 matrix region o path
+    | clockwise = first (+   1 ) $ day10_2 matrix region' (cw o) path
+    | otherwise = first (+ (-1)) $ day10_2 matrix region' (aw o) path
+    where
+        c          = fromMaybe '.' $ matrix !? p
+        clockwise  = (o, c) `elem` [ (N, 'F'), (E, '7'), (S, 'J'), (W, 'L') ]
+        select     = if clockwise then (==) else (/=)
+        corner     = case c of { '7' -> (1, -1); 'F' -> (1, 1); 'J' -> (-1, -1); _ -> (-1, 1) }
+        inBounds   = [(a, b) | a <- [-1, 0, 1], b <- [-1, 0, 1], select (a, b) corner]
+        region'    = foldl (dfs matrix) region $ map (addPair p) inBounds
+
+dfs :: Array (Int, Int) e -> IntSet.IntSet -> (Int, Int) -> IntSet.IntSet
+dfs matrix visited start
+    | hash10 start `IntSet.member` visited || isNothing (matrix !? start) = visited
+    | otherwise = foldl (dfs matrix) visited' $ map (addPair start) dirs
+    where
+        visited' = IntSet.insert (hash10 start) visited
+        dirs     = [(-1, 0), (0, -1), (0, 1), (1, 0)]
 
 
 day9 :: String -> String
@@ -33,23 +102,23 @@ day8 s = show (sol1, sol2) -- (21409, 21165830176709)
     where
         toEntry (k, l, r) = (k, (l, r))
         parseEdge         = filter (all isAlpha) . groupBy (on (==) isAlpha)
-        convert           = toEntry . tuple3 . map hash . parseEdge
-        (dirs, edges)     = bimap (cycle . head) (map convert . drop 2) . dup $ lines s
+        convert           = toEntry . tuple3 . map hash8 . parseEdge
+        (dirs, edges)     = (cycle . head) &&& (map convert . drop 2) $ lines s
         graph             = IntMap.fromList edges
         allA              = filter ((== 0) . (`mod` 26)) . map fst $ edges
 
-        sol1 = find graph dirs (hash "AAA")
+        sol1 = find' graph dirs (hash8 "AAA")
         sol2 = foldl1 lcm $ map (rhythm graph IntMap.empty (zip dirs [0..])) allA
 
-hash :: [Char] -> Int
-hash = sum . zipWith (*) [26 * 26, 26, 1] . map (flip (-) (ord 'A') . ord)
+hash8 :: [Char] -> Int
+hash8 = sum . zipWith (*) [26 * 26, 26, 1] . map (flip (-) (ord 'A') . ord)
 
-find :: IntMap.IntMap (Int, Int) -> String -> Int -> Int
-find _ [] _ = 0
-find m (d:ds) k
-    | k == hash "ZZZ" = 0
-    | d == 'L'        = 1 + find m ds l
-    | otherwise       = 1 + find m ds r
+find' :: IntMap.IntMap (Int, Int) -> String -> Int -> Int
+find' _ [] _ = 0
+find' m (d:ds) k
+    | k == hash8 "ZZZ" = 0
+    | d == 'L'        = 1 + find' m ds l
+    | otherwise       = 1 + find' m ds r
     where (l, r) = m IntMap.! k
 
 rhythm :: IntMap.IntMap (Int, Int) -> IntMap.IntMap [Int] -> [(Char, Int)] -> Int -> Int
@@ -159,11 +228,10 @@ splitRange (a, b) (c, d, e)
 day4 :: String -> String
 day4 s = showIntPair $ day4' stack cards -- (20117, 13768818)
     where
-        split str   = (takeWhile (/='|') str, drop 1 $ dropWhile (/='|') str)
-        nums        = map toInt . words
-        parse       = bimap nums nums . split . drop 1 . dropWhile (':'/=)
-        cards       = map parse $ lines s
-        stack       = replicate (length cards) 0
+        split = nums . takeWhile (/='|') &&& nums . drop 1 . dropWhile (/='|')
+        nums  = map toInt . words
+        cards = map (split . drop 1 . dropWhile (':'/=)) $ lines s
+        stack = replicate (length cards) 0
 
 day4' :: [Int] -> [([Int], [Int])] -> (Int, Int)
 day4' _ [] = (0, 0)
@@ -171,13 +239,12 @@ day4' stack ((winning, ticket) : rest)
     | matches == 0  = (s1, copies + s2)
     | otherwise     = (2 ^ (matches - 1) + s1, copies + s2)
     where
-        winningSet  = IntSet.fromList winning
-        matches     = length . filter id $ map (`IntSet.member` winningSet) ticket
-        copies      = 1 + head stack
-        sstack      = drop 1 stack
-        copyList    = replicate matches copies ++ replicate (length sstack - matches) 0
-        newStack    = zipWith (+) copyList sstack
-        (s1, s2)    = day4' newStack rest
+        winningSet       = IntSet.fromList winning
+        matches          = length . filter id $ map (`IntSet.member` winningSet) ticket
+        (copies, sstack) = ((+1) . head &&& drop 1) stack
+        copyList         = replicate matches copies ++ replicate (length sstack - matches) 0
+        newStack         = zipWith (+) copyList sstack
+        (s1, s2)         = day4' newStack rest
 
 
 
@@ -251,7 +318,7 @@ day2 s = showIntPair (sol1 s, sol2 s) -- (2061, 72596)
 
 
 day1 :: String -> String
-day1 s = show (sol (f "\\d") (l "\\d"), sol (f re) (l re')) -- (55017, 53539)
+day1 s = show (sol ("\\d", "\\d"), sol (re, re')) -- (55017, 53539)
     where
         ints  = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
 
@@ -261,4 +328,4 @@ day1 s = show (sol (f "\\d") (l "\\d"), sol (f re) (l re')) -- (55017, 53539)
         f r = (10*) . toInt . firstMatch r
         l r = toInt . reverse . firstMatch r . reverse
 
-        sol fFunc lFunc = sum . uncurry (zipWith (+)) . bimap (map fFunc) (map lFunc) . dup $ lines s
+        sol (r1, r2) = sum . map (uncurry (+) . (f r1 &&& l r2)) $ lines s

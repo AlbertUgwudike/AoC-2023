@@ -24,6 +24,7 @@ dependencies:
     - regex-tdfa
     - regex-pcre
     - containers
+    - array
 
 ghc-options:
     - -Wall

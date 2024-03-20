@@ -1,8 +1,17 @@
-module Utility (snd3, concatTuples3, toInt, showIntPair, tuple3, adjacentPairs, Card(..), parseCard, Type(..), replace, dup, lcm) where
+module Utility (snd3, concatTuples3, toInt, showIntPair,
+                tuple3, adjacentPairs, Card(..), parseCard,
+                Type(..), replace, dup, lcm, addPair, subPair) where
 
 
 snd3 :: (a, b, c) -> b
 snd3 (_, n, _)  = n
+
+zipTupWith :: (a -> b -> c) -> (a, a) -> (b, b) -> (c, c)
+zipTupWith f (a1, a2) (b1, b2) = (f a1 b1, f a2 b2)
+
+addPair, subPair :: (Int, Int) -> (Int, Int) -> (Int, Int)
+addPair = zipTupWith (+)
+subPair = zipTupWith (-)
 
 concatTuples3 :: [(b, b, b)] -> [b]
 concatTuples3   = (=<<) (\ (n, m, o) -> [n, m, o])
@@ -39,6 +48,7 @@ replace a b (x : xs)
 
 dup :: a -> (a, a)
 dup a = (a, a)
+
 
 data Card = I | II | III | IV | V | VI | VII | VIII | IX | T | J | Q | K | A  deriving (Eq, Ord, Show)
 data Type = High | One | Two | Three | Full | Four | Five  deriving (Eq, Ord)
